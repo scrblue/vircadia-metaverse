@@ -20,7 +20,7 @@ import { accountFromAuthToken } from '@Route-Tools/middleware';
 import { param1FromParams, param2FromParams, param3FromParams } from '@Route-Tools/middleware';
 
 import { GenericFilter } from '@Entities/EntityFilters/GenericFilter';
-import { getObject } from '@Tools/Db';
+import { MongoDbLayer } from '@Tools/Db/MongoDb';
 
 import { Accounts } from '@Entities/Accounts';
 import { SimpleObject } from '@Tools/Misc';
@@ -35,7 +35,8 @@ const procMaintRaw: RequestHandler = async (req: Request, resp: Response, next: 
                 const field = req.vParam2;
                 const value = req.vParam3;
                 const criteria = new GenericFilter(SimpleObject(field, value));
-                req.vRestResp.Data = await getObject(collection, criteria);
+                // TODO: Make the database driver configurable here too
+                req.vRestResp.Data = await MongoDbLayer.getObject(collection, criteria);
             }
             else {
                 req.vRestResp.respondFailure('parameters missing');

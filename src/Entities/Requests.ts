@@ -17,7 +17,7 @@ import { Config } from '@Base/config';
 
 import { RequestEntity } from '@Entities/RequestEntity';
 
-import { createObject, getObject, getObjects, updateObjectFields, deleteOne, deleteMany } from '@Tools/Db';
+import { DBLayer } from '@Tools/Db/Db';
 
 import { CriteriaFilter } from '@Entities/EntityFilters/CriteriaFilter';
 import { GenericFilter } from '@Entities/EntityFilters/GenericFilter';
@@ -36,14 +36,18 @@ export class RequestType {
     public static VERIFYEMAIL = 'verifyEmail';  // verifying email request
 };
 
+
+let dbLayer: DBLayer;
+
 // Initialize request management.
 // Mostly starts a periodic function that deletes expired requests.
-export function initRequests(): void {
+export function initRequests(pDb: DBLayer): void {
+    dbLayer = pDb;
 
     // Expire requests that have pased their prime
     setInterval( async () => {
         const nowtime = new Date();
-        const numDeleted = await deleteMany(requestCollection,
+        const numDeleted = await dbLayer.deleteMany(requestCollection,
                                 new GenericFilter({ 'expirationTime': { $lt: nowtime } }) );
         if (numDeleted > 0) {
             Logger.debug(`Requests.Expiration: expired ${numDeleted} requests`);
@@ -53,7 +57,7 @@ export function initRequests(): void {
 
 export const Requests = {
     async getWithId(pRequestId: string): Promise<RequestEntity> {
-        return IsNullOrEmpty(pRequestId) ? null : getObject(requestCollection,
+        return IsNullOrEmpty(pRequestId) ? null : dbLayer.getObject(requestCollection,
                                                     new GenericFilter({ 'id': pRequestId }));
     },
     // Return all Requests that have the passed Id as either the requester or target.
@@ -61,7 +65,7 @@ export const Requests = {
     async getWithRequesterOrTarget(pRequestId: string, pType: string,
                     pRequesterField: string = 'requestingAccountId',
                     pTargetField: string = 'targetAccountId'): Promise<RequestEntity> {
-        return IsNullOrEmpty(pRequestId) ? null : getObject(requestCollection,
+        return IsNullOrEmpty(pRequestId) ? null : dbLayer.getObject(requestCollection,
                 new GenericFilter(
                     { '$or': [ SimpleObject(pRequesterField, pRequestId),
                             SimpleObject(pTargetField, pRequestId)
@@ -80,7 +84,7 @@ export const Requests = {
         const waytwo: VKeyedCollection = {};
         waytwo[pRequesterField] = pTargetId;
         waytwo[pTargetField] = pRequestId;
-        return IsNullOrEmpty(pRequestId) ? null : getObject(requestCollection,
+        return IsNullOrEmpty(pRequestId) ? null : dbLayer.getObject(requestCollection,
                 new GenericFilter(
                     { '$or': [ wayone, waytwo ],
                     'requestType': pType
@@ -119,14 +123,14 @@ export const Requests = {
         return newRequest;
     },
     add(pRequestEntity: RequestEntity) : Promise<RequestEntity> {
-        return createObject(requestCollection, pRequestEntity);
+        return dbLayer.createObject(requestCollection, pRequestEntity);
     },
     async update(pEntity: RequestEntity, pFields: VKeyedCollection): Promise<RequestEntity> {
-        return updateObjectFields(requestCollection,
+        return dbLayer.updateObjectFields(requestCollection,
                                 new GenericFilter({ 'id': pEntity.id }), pFields);
     },
     async remove(pRequestEntity: RequestEntity) : Promise<boolean> {
-        return deleteOne(requestCollection, new GenericFilter({ 'id': pRequestEntity.id }) );
+        return dbLayer.deleteOne(requestCollection, new GenericFilter({ 'id': pRequestEntity.id }) );
     },
     // Remove all requests for specified account of the specified type
     // If type not specified, remove them all
@@ -137,13 +141,13 @@ export const Requests = {
         if (IsNotNullOrEmpty(pRequestType)) {
             criteria.requestType = pRequestType;
         };
-        return deleteMany(requestCollection, new GenericFilter(criteria));
+        return dbLayer.deleteMany(requestCollection, new GenericFilter(criteria));
     },
     // TODO: add scope (admin) and filter criteria filtering
     //    It's push down to this routine so we could possibly use DB magic for the queries
     async *enumerateAsync(pPager: CriteriaFilter,
                 pInfoer?: CriteriaFilter, pScoper?: CriteriaFilter): AsyncGenerator<RequestEntity> {
-        for await (const acct of getObjects(requestCollection, pPager, pInfoer, pScoper)) {
+        for await (const acct of dbLayer.getObjects(requestCollection, pPager, pInfoer, pScoper)) {
             yield acct;
         };
     }

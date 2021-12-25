@@ -31,7 +31,7 @@ import { GenericFilter } from '@Entities/EntityFilters/GenericFilter';
 import { ValidateResponse } from '@Route-Tools/EntityFieldDefn';
 import { getEntityField, setEntityField, getEntityUpdateForField } from '@Route-Tools/GetterSetter';
 
-import { createObject, getObject, getObjects, updateObjectFields, deleteOne, deleteMany, noCaseCollation } from '@Tools/Db';
+import { DBLayer, noCaseCollation } from '@Tools/Db/Db';
 
 import { GenUUID, IsNullOrEmpty, IsNotNullOrEmpty, genRandomString } from '@Tools/Misc';
 import { VKeyedCollection } from '@Tools/vTypes';
@@ -41,8 +41,11 @@ import { Accounts } from './Accounts';
 
 export let placeCollection = 'places';
 
+let dbLayer: DBLayer;
+
 // Initialize place management.
-export function initPlaces(): void {
+export function initPlaces(pDb: DBLayer): void {
+    dbLayer = pDb;
 
     const placer = new PlaceFilterInfo();
 
@@ -112,17 +115,17 @@ export function initPlaces(): void {
 
 export const Places = {
     async getPlaceWithId(pPlaceId: string): Promise<PlaceEntity> {
-        return IsNullOrEmpty(pPlaceId) ? null : getObject(placeCollection,
+        return IsNullOrEmpty(pPlaceId) ? null : dbLayer.getObject(placeCollection,
                                                 new GenericFilter({ 'id': pPlaceId }));
     },
     async getPlaceWithName(pPlacename: string): Promise<PlaceEntity> {
-        return IsNullOrEmpty(pPlacename) ? null : getObject(placeCollection,
+        return IsNullOrEmpty(pPlacename) ? null : dbLayer.getObject(placeCollection,
                                                 new GenericFilter({ 'name': pPlacename }),
                                                 noCaseCollation);
     },
     async addPlace(pPlaceEntity: PlaceEntity) : Promise<PlaceEntity> {
         Logger.info(`Places: creating place ${pPlaceEntity.name}, id=${pPlaceEntity.id}`);
-        return IsNullOrEmpty(pPlaceEntity) ? null : createObject(placeCollection, pPlaceEntity);
+        return IsNullOrEmpty(pPlaceEntity) ? null : dbLayer.createObject(placeCollection, pPlaceEntity);
     },
     async createPlace(pAccountId: string): Promise<PlaceEntity> {
         const newPlace = new PlaceEntity();
@@ -184,16 +187,16 @@ export const Places = {
     },
     async removePlace(pPlaceEntity: PlaceEntity) : Promise<boolean> {
         Logger.info(`Places: removing place ${pPlaceEntity.name}, id=${pPlaceEntity.id}`);
-        return deleteOne(placeCollection, new GenericFilter({ 'id': pPlaceEntity.id }) );
+        return dbLayer.deleteOne(placeCollection, new GenericFilter({ 'id': pPlaceEntity.id }) );
     },
 
     async removeMany(pCriteria: CriteriaFilter) : Promise<number> {
-        return deleteMany(placeCollection, pCriteria);
+        return dbLayer.deleteMany(placeCollection, pCriteria);
     },
 
     async *enumerateAsync(pPager: CriteriaFilter,
                 pInfoer?: CriteriaFilter, pScoper?: CriteriaFilter): AsyncGenerator<PlaceEntity> {
-        for await (const place of getObjects(placeCollection, pPager, pInfoer, pScoper)) {
+        for await (const place of dbLayer.getObjects(placeCollection, pPager, pInfoer, pScoper)) {
             yield place;
         };
         // return getObjects(placeCollection, pCriteria, pPager); // not sure why this doesn't work
@@ -201,7 +204,7 @@ export const Places = {
 
     // The contents of this entity have been updated
     async updateEntityFields(pEntity: PlaceEntity, pFields: VKeyedCollection): Promise<PlaceEntity> {
-        return updateObjectFields(placeCollection,
+        return dbLayer.updateObjectFields(placeCollection,
                                 new GenericFilter({ 'id': pEntity.id }), pFields);
     },
 

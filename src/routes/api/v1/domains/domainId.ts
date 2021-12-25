@@ -31,7 +31,6 @@ import { VKeyedCollection } from '@Tools/vTypes';
 import { Logger } from '@Tools/Logging';
 import Config from '@Base/config';
 import { IsNullOrEmpty } from '@Tools/Misc';
-import { updateObjectFields } from '@Tools/Db';
 
 // GET /api/v1/domains/:domainId
 // Return a small snippet if domain data for the domainId specified in the request

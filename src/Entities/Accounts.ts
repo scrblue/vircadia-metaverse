@@ -32,7 +32,7 @@ import { GenericFilter } from '@Entities/EntityFilters/GenericFilter';
 import { ValidateResponse } from '@Route-Tools/EntityFieldDefn';
 import { getEntityField, setEntityField, getEntityUpdateForField } from '@Route-Tools/GetterSetter';
 
-import { createObject, getObject, getObjects, updateObjectFields, deleteOne, noCaseCollation, countObjects } from '@Tools/Db';
+import { DBLayer, noCaseCollation } from '@Tools/Db/Db';
 import { GenUUID, genRandomString, IsNullOrEmpty, IsNotNullOrEmpty, SendVerificationEmail } from '@Tools/Misc';
 import { VKeyedCollection, SArray } from '@Tools/vTypes';
 import { Logger } from '@Tools/Logging';
@@ -40,16 +40,19 @@ import { Requests } from './Requests';
 
 export let accountCollection = 'accounts';
 
+let dbLayer: DBLayer;
+
 // Initialize account management.
-export function initAccounts(): void {
+export function initAccounts(pDB: DBLayer): void {
+    dbLayer = pDB;
     // Validate the fields have been initialized
     CheckAccountFields();
 };
 
 export const Accounts = {
     async getAccountWithId(pAccountId: string): Promise<AccountEntity> {
-        return IsNullOrEmpty(pAccountId) ? null : getObject(accountCollection,
-                        new GenericFilter({ 'id': pAccountId }));
+        return IsNullOrEmpty(pAccountId) ? null : dbLayer.getObject(accountCollection,
+            new GenericFilter({ 'id': pAccountId }));
     },
     async getAccountWithAuthToken(pAuthToken: string): Promise<AccountEntity> {
         if (IsNotNullOrEmpty(pAuthToken)) {
@@ -70,29 +73,29 @@ export const Accounts = {
             // build username query with case-insensitive Regex.
             // When indexes are added, create a 'username' case-insensitive index.
             // Need to clean the username of search characters since we're just passing it to the database
-            return getObject(accountCollection,
-                        new GenericFilter({ 'username': pUsername }), noCaseCollation );
-                // { 'username': new RegExp(['^', pUsername.replace('[\\\*]', ''), '$'].join(''), 'i') } );
+            return dbLayer.getObject(accountCollection,
+                new GenericFilter({ 'username': pUsername }), noCaseCollation);
+            // { 'username': new RegExp(['^', pUsername.replace('[\\\*]', ''), '$'].join(''), 'i') } );
         };
         return null;
     },
     async getAccountWithNodeId(pNodeId: string): Promise<AccountEntity> {
-        return IsNullOrEmpty(pNodeId) ? null : getObject(accountCollection,
-                        new GenericFilter({ 'locationNodeid': pNodeId }));
+        return IsNullOrEmpty(pNodeId) ? null : dbLayer.getObject(accountCollection,
+            new GenericFilter({ 'locationNodeid': pNodeId }));
     },
     async getAccountWithEmail(email: string): Promise<AccountEntity> {
-        return IsNullOrEmpty(email) ? null : getObject(accountCollection,
-                        new GenericFilter({ 'email': email }), noCaseCollation );
+        return IsNullOrEmpty(email) ? null : dbLayer.getObject(accountCollection,
+            new GenericFilter({ 'email': email }), noCaseCollation);
     },
-    async addAccount(pAccountEntity: AccountEntity) : Promise<AccountEntity> {
+    async addAccount(pAccountEntity: AccountEntity): Promise<AccountEntity> {
         Logger.info(`Accounts: creating account ${pAccountEntity.username}, id=${pAccountEntity.id}`);
-        return createObject(accountCollection, pAccountEntity);
+        return dbLayer.createObject(accountCollection, pAccountEntity);
     },
-    async removeAccount(pAccountEntity: AccountEntity) : Promise<boolean> {
+    async removeAccount(pAccountEntity: AccountEntity): Promise<boolean> {
         Logger.info(`Accounts: removing account ${pAccountEntity.username}, id=${pAccountEntity.id}`);
-        return deleteOne(accountCollection, new GenericFilter({ 'id': pAccountEntity.id }) );
+        return dbLayer.deleteOne(accountCollection, new GenericFilter({ 'id': pAccountEntity.id }));
     },
-    async removeAccountContext(pAccountEntity: AccountEntity) : Promise<void> {
+    async removeAccountContext(pAccountEntity: AccountEntity): Promise<void> {
         // Friends and Connections
         Logger.info(`Accounts: removing relationships for account ${pAccountEntity.username}, id=${pAccountEntity.id}`);
         if (pAccountEntity.connections) {
@@ -117,29 +120,29 @@ export const Accounts = {
             await Domains.removeDomainContext(aDomain);
         };
         // Also, any places
-        await Places.removeMany(new GenericFilter( { 'accountId': pAccountEntity.id }));
+        await Places.removeMany(new GenericFilter({ 'accountId': pAccountEntity.id }));
     },
     // The contents of this entity have been updated
     async updateEntityFields(pEntity: AccountEntity, pFields: VKeyedCollection): Promise<AccountEntity> {
-        return updateObjectFields(accountCollection, new GenericFilter({ 'id': pEntity.id }), pFields);
+        return dbLayer.updateObjectFields(accountCollection, new GenericFilter({ 'id': pEntity.id }), pFields);
     },
     // Get the value of a domain field with the fieldname.
     // Checks to make sure the getter has permission to get the values.
     // Returns the value. Could be 'undefined' whether the requestor doesn't have permissions or that's
     //     the actual field value.
     async getField(pAuthToken: AuthToken, pAccount: AccountEntity,
-                    pField: string, pRequestingAccount?: AccountEntity): Promise<any> {
+        pField: string, pRequestingAccount?: AccountEntity): Promise<any> {
         return getEntityField(accountFields, pAuthToken, pAccount, pField, pRequestingAccount);
     },
     // Set a domain field with the fieldname and a value.
     // Checks to make sure the setter has permission to set.
     // Returns 'true' if the value was set and 'false' if the value could not be set.
     async setField(pAuthToken: AuthToken,  // authorization for making this change
-              pAccount: AccountEntity,            // the account being changed
-              pField: string, pVal: any,          // field being changed and the new value
-              pRequestingAccount?: AccountEntity, // Account associated with pAuthToken, if known
-              pUpdates?: VKeyedCollection         // where to record updates made (optional)
-                      ): Promise<ValidateResponse> {
+        pAccount: AccountEntity,            // the account being changed
+        pField: string, pVal: any,          // field being changed and the new value
+        pRequestingAccount?: AccountEntity, // Account associated with pAuthToken, if known
+        pUpdates?: VKeyedCollection         // where to record updates made (optional)
+    ): Promise<ValidateResponse> {
         return setEntityField(accountFields, pAuthToken, pAccount, pField, pVal, pRequestingAccount, pUpdates);
     },
     // Generate an 'update' block for the specified field or fields.
@@ -148,7 +151,7 @@ export const Accounts = {
     //     we want the actual value (whatever it is) to go into the database.
     // If an existing VKeyedCollection is passed, it is added to an returned.
     getUpdateForField(pAccount: AccountEntity,
-                    pField: string | string[], pExisting?: VKeyedCollection): VKeyedCollection {
+        pField: string | string[], pExisting?: VKeyedCollection): VKeyedCollection {
         return getEntityUpdateForField(accountFields, pAccount, pField, pExisting);
     },
     // Verify that the passed value is legal for the named field
@@ -161,11 +164,11 @@ export const Accounts = {
     },
     // Return the number of accounts that match the criteria
     async accountCount(pCriteria: CriteriaFilter): Promise<number> {
-        return countObjects(accountCollection, pCriteria);
+        return dbLayer.countObjects(accountCollection, pCriteria);
     },
     createAccount(pUsername: string, pPassword: string, pEmail: string): AccountEntity {
         const newAcct = new AccountEntity();
-        newAcct.id= GenUUID();
+        newAcct.id = GenUUID();
         newAcct.username = pUsername;
         newAcct.email = pEmail.toLowerCase();
         newAcct.roles = [Roles.USER];
@@ -221,8 +224,8 @@ export const Accounts = {
     // TODO: add scope (admin) and filter criteria filtering
     //    It's push down to this routine so we could possibly use DB magic for the queries
     async *enumerateAsync(pPager: CriteriaFilter,
-              pInfoer?: CriteriaFilter, pScoper?: CriteriaFilter): AsyncGenerator<AccountEntity> {
-        for await (const acct of getObjects(accountCollection, pPager, pInfoer, pScoper)) {
+        pInfoer?: CriteriaFilter, pScoper?: CriteriaFilter): AsyncGenerator<AccountEntity> {
+        for await (const acct of dbLayer.getObjects(accountCollection, pPager, pInfoer, pScoper)) {
             yield acct;
         };
         // return getObjects(accountCollection, pCriteria, pPager);
@@ -270,7 +273,7 @@ export const Accounts = {
         await Accounts.updateEntityFields(pAccount, updates);
         const otherAccount = await Accounts.getAccountWithUsername(pConnectionName);
         if (otherAccount) {
-        updates = {};
+            updates = {};
             await Accounts.setField(adminToken, otherAccount, 'connections', { 'remove': pAccount.username }, otherAccount, updates);
             await Accounts.setField(adminToken, otherAccount, 'friends', { 'remove': pAccount.username }, otherAccount, updates);
             await Accounts.updateEntityFields(otherAccount, updates);

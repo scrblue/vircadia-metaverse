@@ -28,7 +28,7 @@ import { getEntityField, setEntityField, getEntityUpdateForField } from '@Route-
 
 import { Maturity } from '@Entities/Sets/Maturity';
 
-import { createObject, getObject, getObjects, countObjects, updateObjectFields, deleteOne } from '@Tools/Db';
+import { DBLayer } from '@Tools/Db/Db';
 
 import { GenUUID, IsNullOrEmpty, IsNotNullOrEmpty } from '@Tools/Misc';
 import { VKeyedCollection } from '@Tools/vTypes';
@@ -36,9 +36,12 @@ import { Logger } from '@Tools/Logging';
 
 export let domainCollection = 'domains';
 
+let dbLayer: DBLayer;
+
 // Initialize domain management.
 // Periodic checks on liveness of domains and resetting of values if not talking
-export function initDomains(): void {
+export function initDomains(pDb: DBLayer): void {
+    dbLayer = pDb;
 
     // Validate the fields are all set (DEBUG DEGUG for problems with circular references)
     CheckDomainFields();
@@ -70,20 +73,20 @@ export function initDomains(): void {
 
 export const Domains = {
     async getDomainWithId(pDomainId: string): Promise<DomainEntity> {
-        return IsNullOrEmpty(pDomainId) ? null : getObject(domainCollection,
+        return IsNullOrEmpty(pDomainId) ? null : dbLayer.getObject(domainCollection,
                                             new GenericFilter({ 'id': pDomainId }));
     },
     async getDomainWithAPIKey(pApiKey: string): Promise<DomainEntity> {
-        return IsNullOrEmpty(pApiKey) ? null : getObject(domainCollection,
+        return IsNullOrEmpty(pApiKey) ? null : dbLayer.getObject(domainCollection,
                                             new GenericFilter({ 'apiKey': pApiKey }));
     },
     async getDomainWithSenderKey(pSenderKey: string): Promise<DomainEntity> {
-        return IsNullOrEmpty(pSenderKey) ? null : getObject(domainCollection,
+        return IsNullOrEmpty(pSenderKey) ? null : dbLayer.getObject(domainCollection,
                                             new GenericFilter({ 'lastSenderKey': pSenderKey }));
     },
     async addDomain(pDomainEntity: DomainEntity) : Promise<DomainEntity> {
         Logger.info(`Domains: creating domain ${pDomainEntity.name}, id=${pDomainEntity.id}`);
-        return IsNullOrEmpty(pDomainEntity) ? null : createObject(domainCollection, pDomainEntity);
+        return IsNullOrEmpty(pDomainEntity) ? null : dbLayer.createObject(domainCollection, pDomainEntity);
     },
     createDomain(): DomainEntity {
         const newDomain = new DomainEntity();
@@ -97,7 +100,7 @@ export const Domains = {
     },
     async removeDomain(pDomainEntity: DomainEntity) : Promise<boolean> {
         Logger.info(`Domains: removing domain ${pDomainEntity.name}, id=${pDomainEntity.id}`);
-        return deleteOne(domainCollection, new GenericFilter({ 'id': pDomainEntity.id }) );
+        return dbLayer.deleteOne(domainCollection, new GenericFilter({ 'id': pDomainEntity.id }) );
     },
     // When removing a domain, other tables need cleaning up
     async removeDomainContext(pDomainEntity: DomainEntity): Promise<void> {
@@ -137,18 +140,18 @@ export const Domains = {
     },
     // Return the number of domains that match the criteria
     async domainCount(pCriteria: CriteriaFilter): Promise<number> {
-        return countObjects(domainCollection, pCriteria);
+        return dbLayer.countObjects(domainCollection, pCriteria);
     },
     async *enumerateAsync(pPager: CriteriaFilter,
                 pInfoer?: CriteriaFilter, pScoper?: CriteriaFilter): AsyncGenerator<DomainEntity> {
-        for await (const domain of getObjects(domainCollection, pPager, pInfoer, pScoper)) {
+        for await (const domain of dbLayer.getObjects(domainCollection, pPager, pInfoer, pScoper)) {
             yield domain;
         };
         // return getObjects(domainCollection, pCriteria, pPager); // not sure why this doesn't work
     },
     // The contents of this entity have been updated
     async updateEntityFields(pEntity: DomainEntity, pFields: VKeyedCollection): Promise<DomainEntity> {
-        return updateObjectFields(domainCollection,
+        return dbLayer.updateObjectFields(domainCollection,
                                 new GenericFilter({ 'id': pEntity.id }), pFields);
     },
     // Return the Date when an domain is considered inactive

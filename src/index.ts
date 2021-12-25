@@ -38,7 +38,8 @@ import { initSessions } from '@Entities/Sessions';
 import { initRequests } from '@Entities/Requests';
 import { initMonitoring } from '@Monitoring/Monitoring';
 
-import { setupDB } from '@Tools/Db';
+import { DBLayer } from '@Tools/Db/Db';
+import { MongoDbLayer } from '@Tools/Db/MongoDb';
 import { IsNotNullOrEmpty } from '@Tools/Misc';
 import { Logger, initLogging, morganOptions } from '@Tools/Logging';
 
@@ -51,12 +52,15 @@ initializeConfiguration()
   initLogging();
   initMonitoring();
   initSessions();
-  initTokens();
-  initRequests();
-  initAccounts();
-  initDomains();
-  initPlaces();
-  return setupDB();
+  // TODO: Perhaps instead of specifying the layer for each subsystem, you should be able to do one
+  // init function creating a more global DBLayer. Is there a usecase for different database layers
+  // for different systems?
+  initTokens(MongoDbLayer);
+  initRequests(MongoDbLayer);
+  initAccounts(MongoDbLayer);
+  initDomains(MongoDbLayer);
+  initPlaces(MongoDbLayer);
+  return MongoDbLayer.setupDB();
 })
 .catch( err => {
   Logger.error('main: failure opening database: ' + err);
@@ -208,7 +212,7 @@ function ShutdownServer(pServer: http.Server|https.Server, pMsg: string): void {
 
 // Search a directory for .js files that export a 'router' property and return a
 //    new Router that routes to those exports.
-function createAPIRouter(pBaseDir: string): Router {
+export function createAPIRouter(pBaseDir: string): Router {
   // Logger.debug('createAPIRouter: adding routes from ' + pBaseDir);
   return glob
     // find all .js files in the passed subdirectory
