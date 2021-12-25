@@ -24,7 +24,7 @@ import { VKeyedCollection } from '@Tools/vTypes';
 import { SimpleObject, IsNullOrEmpty, IsNotNullOrEmpty } from '@Tools/Misc';
 import { Logger } from '@Tools/Logging';
 
-let MapDB = new Map<string, any[]>();
+const MapDB = new Map<string, any[]>();
 
 export const MapDbLayer: DBLayer = {
     setupDB: async () => {
@@ -39,7 +39,7 @@ export const MapDbLayer: DBLayer = {
 
     getObject: async (pCollection: string, pCriteria: CriteriaFilter, _pCollation?: any) => {
         // TODO: Support collation
-        for (let element of MapDB.get(pCollection)) {
+        for (const element of MapDB.get(pCollection)) {
             if (pCriteria.criteriaTest(element)) {
                 return element;
             }
@@ -56,7 +56,7 @@ export const MapDbLayer: DBLayer = {
         // TODO: the deepmerge bit as in MongoDB implementation
 
         // For every element that matches all three criteia, yield that element
-        for (let element of MapDB.get(pCollection)) {
+        for (const element of MapDB.get(pCollection)) {
             if ((pPager ? pPager.criteriaTest(element) : true)
                 && (pInfoer ? pInfoer.criteriaTest(element) : true)
                 && (pScoper ? pScoper.criteriaTest(element) : true)
@@ -77,7 +77,7 @@ export const MapDbLayer: DBLayer = {
         };
 
         // Find the first element that matches the criteria provided
-        for (let collectionElem of MapDB.get(pColllection)) {
+        for (const collectionElem of MapDB.get(pColllection)) {
             if (pCriteria.criteriaTest(collectionElem)) {
                 // Iterate through the provided fields to change and set them. Null values should be
                 // empty strings
@@ -100,7 +100,7 @@ export const MapDbLayer: DBLayer = {
 
     deleteOne: async (pCollection: string, pCriteria: CriteriaFilter) => {
         let index;
-        let arr = MapDB.get(pCollection);
+        const arr = MapDB.get(pCollection);
 
         // Find the element
         for (const elem of arr) {
@@ -122,15 +122,15 @@ export const MapDbLayer: DBLayer = {
 
     deleteMany: async (pCollection: string, pCriteria: CriteriaFilter) => {
         let count = 0;
-        let indices = [];
-        let arr = MapDB.get(pCollection);
+        const indices = [];
+        const arr = MapDB.get(pCollection);
 
         // Push the index of every matching element to `indices`
         for (const elem of arr) {
             if (pCriteria.criteriaTest(elem)) {
                 count++;
                 indices.push(arr.indexOf(elem));
-            };       
+            };
         };
 
         // Delete each index in `indices`
