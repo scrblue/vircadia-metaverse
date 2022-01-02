@@ -81,6 +81,7 @@ const procPostUsers: RequestHandler = async (req: Request, resp: Response, next:
                 ifValid = await Accounts.validateFieldValue("email", userEmail);
                 if (ifValid.valid) {
                     // See if account already exists
+                    // NOTE: This check is done in validating the username and email just above too
                     let prevAccount = await Accounts.getAccountWithUsername(userName);
                     if (IsNullOrEmpty(prevAccount)) {
                         prevAccount = await Accounts.getAccountWithEmail(userEmail);
